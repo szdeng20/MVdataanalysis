@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Water Treatment: Coagulation & Flocculation Simulator</title>
+<style>
+  :root {
+    --deep: #0a1628;
+    --navy: #0d2240;
+    --blue: #1a4a7a;
+    --teal: #0e8fa8;
+    --cyan: #4dd9ec;
+    --clear: #b8f0f9;
+    --turbid: #a0622a;
+    --floc: #c8a46e;
+    --hard: #d4b896;
+    --accent: #f0c040;
+    --green: #2ec27e;
+    --red: #e05050;
+    --text: #e8f4f8;
+    --muted: #7aacbe;
+    --panel: rgba(13,34,64,0.85);
+    --border: rgba(77,217,236,0.2);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--deep);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(135deg, var(--navy) 0%, #0a2a50 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .logo-drop {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--cyan), var(--blue));
+    box-shadow: 0 0 20px rgba(77,217,236,0.4);
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.02em; }
+  header p { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+  .badge {
+    margin-left: auto;
+    background: rgba(77,217,236,0.12);
+    border: 1px solid var(--teal);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 0.72rem;
+    color: var(--cyan);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── NAV TABS ── */
+  nav {
+    display: flex;
+    gap: 0;
+    background: var(--navy);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    overflow-x: auto;
+  }
+  nav button {
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.83rem;
+    font-weight: 500;
+    padding: 12px 20px;
+    white-space: nowrap;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+  }
+  nav button.active {
+    color: var(--cyan);
+    border-bottom-color: var(--cyan);
+  }
+  nav button:hover:not(.active) { color: var(--text); }
+
+  /* ── MAIN LAYOUT ── */
+  .page { display: none; padding: 24px 32px 40px; max-width: 1280px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* ── SECTION LABELS ── */
+  .section-eyebrow {
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 6px;
+  }
+  h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 6px; }
+  .lead { color: var(--muted); font-size: 0.9rem; max-width: 720px; line-height: 1.6; margin-bottom: 24px; }
+
+  /* ── SIMULATION LAYOUT ── */
+  .sim-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) { .sim-grid { grid-template-columns: 1fr; } }
+
+  /* ── TANK ── */
+  .tank-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .tank-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  canvas#tankCanvas {
+    display: block;
+    width: 100%;
+    border-radius: 8px;
+    background: #071830;
+    border: 1px solid rgba(77,217,236,0.15);
+  }
+  .tank-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .metric-box {
+    background: rgba(10,22,40,0.8);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .metric-val {
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .metric-lbl { font-size: 0.68rem; color: var(--muted); margin-top: 4px; letter-spacing: 0.06em; }
+
+  /* ── CONTROLS PANEL ── */
+  .ctrl-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .ctrl-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .ctrl-group label span { color: var(--cyan); font-weight: 700; }
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px rgba(77,217,236,0.6);
+    cursor: pointer;
+  }
+  .slider-ph { background: linear-gradient(to right, #d44, #f80, #ff0, #4d4, #04a, #84e); }
+  .slider-alk { background: linear-gradient(to right, #1a4a7a, #4dd9ec); }
+  .slider-coag { background: linear-gradient(to right, #1a4a7a, #f0c040); }
+  .slider-hard { background: linear-gradient(to right, #2a5a2a, #d4b896); }
+
+  .ctrl-hint { font-size: 0.72rem; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--teal), var(--blue));
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 10px 16px;
+    width: 100%;
+    transition: opacity 0.2s, transform 0.1s;
+    letter-spacing: 0.03em;
+  }
+  .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .efficiency-bar-wrap {
+    background: rgba(10,22,40,0.8);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .eff-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .eff-bar-bg {
+    height: 14px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 7px;
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  .eff-bar-fill {
+    height: 100%;
+    border-radius: 7px;
+    transition: width 0.6s ease, background 0.4s;
+  }
+  .eff-val { font-size: 1rem; font-weight: 700; text-align: right; }
+
+  .status-msg {
+    font-size: 0.78rem;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border-left: 3px solid;
+    line-height: 1.5;
+  }
+  .status-good { background: rgba(46,194,126,0.1); border-color: var(--green); color: #7de0aa; }
+  .status-warn { background: rgba(240,192,64,0.1); border-color: var(--accent); color: #f0d080; }
+  .status-bad  { background: rgba(224,80,80,0.1);  border-color: var(--red); color: #f09090; }
+
+  /* ── THEORY CARDS ── */
+  .concept-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 18px;
+    margin-bottom: 28px;
+  }
+  .concept-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .concept-card h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; }
+  .concept-card p { font-size: 0.82rem; color: var(--muted); line-height: 1.65; }
+  .concept-card ul { font-size: 0.82rem; color: var(--muted); line-height: 1.65; padding-left: 16px; margin-top: 6px; }
+  .icon-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+  }
+
+  /* ── TSS vs TDS ── */
+  .tss-tds-visual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 20px 0 28px;
+  }
+  @media (max-width: 700px) { .tss-tds-visual { grid-template-columns: 1fr; } }
+  .water-jar {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .water-jar h3 { font-size: 0.85rem; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.04em; }
+  canvas.jar-canvas {
+    display: block;
+    margin: 0 auto 10px;
+    border-radius: 8px;
+  }
+  .jar-desc { font-size: 0.78rem; color: var(--muted); line-height: 1.55; }
+  .jar-examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    justify-content: center;
+  }
+  .jar-tag {
+    font-size: 0.68rem;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: rgba(77,217,236,0.1);
+    border: 1px solid rgba(77,217,236,0.3);
+    color: var(--cyan);
+  }
+
+  /* ── HARDNESS TABLE ── */
+  .hardness-section { margin: 28px 0; }
+  .hardness-section h3 { font-size: 1.05rem; margin-bottom: 14px; }
+  .hardness-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .hard-card {
+    border-radius: 10px;
+    padding: 16px;
+    border: 1px solid;
+  }
+  .hard-card.temp { background: rgba(46,194,126,0.08); border-color: rgba(46,194,126,0.3); }
+  .hard-card.perm { background: rgba(224,80,80,0.08); border-color: rgba(224,80,80,0.3); }
+  .hard-card h4 { font-size: 0.85rem; font-weight: 700; margin-bottom: 6px; }
+  .hard-card p { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+  .hard-card code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: var(--cyan); }
+
+  /* ── REMOVAL METHODS ── */
+  .removal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .removal-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .removal-card .step-num {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 4px;
+  }
+  .removal-card h4 { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; }
+  .removal-card p { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+  .removal-card .chem { font-size: 0.72rem; color: var(--accent); margin-top: 6px; font-style: italic; }
+
+  /* ── COMPARISON TABLE ── */
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 16px 0; }
+  .compare-table th {
+    background: var(--blue);
+    color: var(--cyan);
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .compare-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  .compare-table tr:nth-child(even) td { background: rgba(13,34,64,0.5); }
+  .compare-table tr:hover td { background: rgba(77,217,236,0.05); color: var(--text); }
+
+  /* ── PROCESS FLOW ── */
+  .process-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 16px 0;
+    margin: 20px 0;
+  }
+  .flow-step {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    min-width: 130px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .flow-step .fs-icon { font-size: 1.5rem; margin-bottom: 4px; }
+  .flow-step .fs-name { font-size: 0.75rem; font-weight: 700; color: var(--cyan); }
+  .flow-step .fs-desc { font-size: 0.68rem; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+  .flow-arrow {
+    color: var(--teal);
+    font-size: 1.3rem;
+    padding: 0 6px;
+    flex-shrink: 0;
+  }
+
+  /* ── DIVIDER ── */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+
+  /* ── TOOLTIP ── */
+  .tooltip-wrap { position: relative; display: inline-block; }
+  .tooltip-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: var(--cyan);
+    font-size: 0.65rem;
+    font-weight: 700;
+    cursor: help;
+    vertical-align: middle;
+    margin-left: 4px;
+    border: 1px solid rgba(77,217,236,0.4);
+  }
+  .tooltip-box {
+    display: none;
+    position: absolute;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0a1e3a;
+    border: 1px solid var(--teal);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.72rem;
+    color: var(--text);
+    width: 200px;
+    z-index: 100;
+    line-height: 1.5;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  .tooltip-wrap:hover .tooltip-box { display: block; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--deep); }
+  ::-webkit-scrollbar-thumb { background: var(--blue); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-drop"></div>
+  <div>
+    <h1>Water Treatment Simulator</h1>
+    <p>Coagulation · Flocculation · Hardness · TSS vs TDS</p>
+  </div>
+  <div class="badge">SP PACE Academy</div>
+</header>
+
+<nav>
+  <button class="active" onclick="showPage('sim')">⚗️ Simulation</button>
+  <button onclick="showPage('theory')">📘 Coag/Flocc Theory</button>
+  <button onclick="showPage('tss-tds')">🔬 TSS vs TDS</button>
+  <button onclick="showPage('hardness')">💧 Hardness & Removal</button>
+</nav>
+
+<!-- ═══════════════════════ PAGE 1: SIMULATION ═══════════════════════ -->
+<div class="page active" id="page-sim">
+  <div class="section-eyebrow">Interactive Simulator</div>
+  <h2>Coagulation & Flocculation Tank</h2>
+  <p class="lead">Adjust pH, alkalinity, coagulant dose, and raw water hardness to observe how particles coagulate and settle. Watch the animated tank respond in real time.</p>
+
+  <div class="sim-grid">
+    <div>
+      <div class="tank-wrap">
+        <div class="tank-label">Rapid Mix → Slow Mix → Settling</div>
+        <canvas id="tankCanvas" height="320"></canvas>
+        <div class="tank-metrics">
+          <div class="metric-box">
+            <div class="metric-val" id="mTurbidity" style="color:#a0622a">—</div>
+            <div class="metric-lbl">Turbidity (NTU)</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" id="mTSS" style="color:#c8a46e">—</div>
+            <div class="metric-lbl">TSS (mg/L)</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" id="mTDS" style="color:#4dd9ec">—</div>
+            <div class="metric-lbl">TDS (mg/L)</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" id="mHardness" style="color:#d4b896">—</div>
+            <div class="metric-lbl">Hardness (mg/L CaCO₃)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ctrl-panel">
+      <div>
+        <div style="font-size:0.8rem;font-weight:700;color:var(--cyan);margin-bottom:14px;letter-spacing:0.06em;text-transform:uppercase;">Process Controls</div>
+
+        <div class="ctrl-group">
+          <label>pH of Water <span id="valPH">7.0</span></label>
+          <input type="range" id="slPH" min="4" max="11" step="0.1" value="7.0" class="slider-ph" oninput="updateSim()">
+          <div class="ctrl-hint">Optimal coagulation: pH 6.5–7.5. Outside this range efficiency drops.</div>
+        </div>
+
+        <div class="ctrl-group" style="margin-top:14px;">
+          <label>Alkalinity <span id="valAlk">80</span> mg/L CaCO₃
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Alkalinity (bicarbonate/carbonate) buffers pH. High alkalinity keeps pH stable; very low alkalinity lets pH crash during coagulation, reducing effectiveness.</span></span>
+          </label>
+          <input type="range" id="slAlk" min="10" max="250" step="5" value="80" class="slider-alk" oninput="updateSim()">
+          <div class="ctrl-hint">Low alkalinity (&lt;40 mg/L) — pH may crash. High alkalinity — good pH buffer.</div>
+        </div>
+
+        <div class="ctrl-group" style="margin-top:14px;">
+          <label>Coagulant Dose (Alum) <span id="valCoag">20</span> mg/L
+            <span class="tooltip-wrap"><span class="tooltip-icon">?</span><span class="tooltip-box">Alum (Al₂(SO₄)₃) hydrolyses to Al(OH)₃ floc. Underdosing leaves particles uncharged; overdosing restabilises colloids.</span></span>
+          </label>
+          <input type="range" id="slCoag" min="0" max="80" step="1" value="20" class="slider-coag" oninput="updateSim()">
+          <div class="ctrl-hint">Typical dose: 10–40 mg/L. Jar test determines optimum.</div>
+        </div>
+
+        <div class="ctrl-group" style="margin-top:14px;">
+          <label>Raw Water Hardness <span id="valHard">150</span> mg/L CaCO₃</label>
+          <input type="range" id="slHard" min="0" max="500" step="10" value="150" class="slider-hard" oninput="updateSim()">
+          <div class="ctrl-hint">Hard water (Ca²⁺/Mg²⁺) increases TDS and may compete with coagulant. Raises sludge volume.</div>
+        </div>
+      </div>
+
+      <div class="efficiency-bar-wrap">
+        <div class="eff-label">Flocculation Efficiency</div>
+        <div class="eff-bar-bg">
+          <div class="eff-bar-fill" id="effBar" style="width:60%;background:var(--teal)"></div>
+        </div>
+        <div class="eff-val" id="effVal" style="color:var(--teal)">—%</div>
+      </div>
+
+      <div class="status-msg status-warn" id="statusMsg">Adjust sliders to begin simulation.</div>
+
+      <button class="btn-primary" onclick="resetSim()">↺ Reset to Defaults</button>
+      <button class="btn-primary" style="background:linear-gradient(135deg,#2ec27e,#0e5a3a);" onclick="optimalSim()">✓ Apply Optimal Conditions</button>
+    </div>
+  </div>
+
+  <!-- Process Flow -->
+  <div style="margin-top:28px;">
+    <div class="section-eyebrow">Treatment Process</div>
+    <div class="process-flow">
+      <div class="flow-step"><div class="fs-icon">🪣</div><div class="fs-name">Raw Water</div><div class="fs-desc">High turbidity TSS, hardness</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="fs-icon">⚗️</div><div class="fs-name">Coagulation</div><div class="fs-desc">Alum/FeCl₃ added. Rapid mix ~1 min</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="fs-icon">🔄</div><div class="fs-name">Flocculation</div><div class="fs-desc">Slow mix 20–40 min. Microfloc → macrofloc</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="fs-icon">🏛️</div><div class="fs-name">Sedimentation</div><div class="fs-desc">Floc settles, sludge removed</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="fs-icon">🔵</div><div class="fs-name">Filtration</div><div class="fs-desc">Remaining TSS removed</div></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step"><div class="fs-icon">✨</div><div class="fs-name">Clear Effluent</div><div class="fs-desc">Low turbidity, treated water</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PAGE 2: THEORY ═══════════════════════ -->
+<div class="page" id="page-theory">
+  <div class="section-eyebrow">Conceptual Foundation</div>
+  <h2>Coagulation & Flocculation Theory</h2>
+  <p class="lead">Suspended particles in raw water carry a negative surface charge, keeping them dispersed by electrostatic repulsion (zeta potential). Coagulation neutralises this charge; flocculation then bridges particles into settleable floc.</p>
+
+  <div class="concept-grid">
+    <div class="concept-card">
+      <div class="icon-chip" style="background:rgba(224,80,80,0.15);">⚡</div>
+      <h3 style="color:#f09090;">Why Particles Stay Suspended</h3>
+      <p>Colloidal particles (0.001–1 µm) develop a negative surface charge due to isomorphous substitution and ionisation. This creates an electrical double layer (Stern + diffuse layer) with a repulsive energy barrier. <strong>Zeta potential</strong> (typically −20 to −30 mV) keeps particles stable.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon-chip" style="background:rgba(240,192,64,0.15);">⚗️</div>
+      <h3 style="color:var(--accent);">Coagulation Mechanisms</h3>
+      <p>Four mechanisms act simultaneously:</p>
+      <ul>
+        <li><strong>Double-layer compression</strong> — counter-ions compress the diffuse layer</li>
+        <li><strong>Charge neutralisation</strong> — Al³⁺/Fe³⁺ species adsorb on particle surface</li>
+        <li><strong>Sweep flocculation</strong> — Al(OH)₃ precipitate enmeshes particles</li>
+        <li><strong>Adsorption & bridging</strong> — polymer bridges link particles</li>
+      </ul>
+    </div>
+    <div class="concept-card">
+      <div class="icon-chip" style="background:rgba(77,217,236,0.15);">🔄</div>
+      <h3 style="color:var(--cyan);">Role of pH</h3>
+      <p>Alum hydrolysis produces Al(OH)₃ only within pH 6–8. Outside this range, soluble Al³⁺ or aluminate Al(OH)₄⁻ forms instead — neither coagulates effectively. pH also affects particle surface charge and coagulant speciation. <strong>Optimal pH: 6.5–7.5</strong> for alum.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon-chip" style="background:rgba(46,194,126,0.15);">🧪</div>
+      <h3 style="color:var(--green);">Role of Alkalinity</h3>
+      <p>Each mg/L of alum consumes ~0.45 mg/L of alkalinity to produce Al(OH)₃. If alkalinity is too low (&lt;40 mg/L CaCO₃), pH drops sharply during coagulation, moving outside the optimal zone. High alkalinity buffers against this pH crash. Lime or soda ash may be dosed to boost alkalinity.</p>
+      <p style="margin-top:8px;font-style:italic;">Al₂(SO₄)₃ + 6HCO₃⁻ → 2Al(OH)₃↓ + 3SO₄²⁻ + 6CO₂</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon-chip" style="background:rgba(160,98,42,0.2);">🧱</div>
+      <h3 style="color:var(--floc);">Role of Hardness</h3>
+      <p>Ca²⁺ and Mg²⁺ (hardness ions) can <strong>compress the double layer</strong> and assist coagulation at low doses. However, very hard water (>300 mg/L CaCO₃) may compete with Al³⁺ for floc surface sites, reduce coagulant effectiveness, and increase sludge volume. Hardness ions remain in solution as TDS unless specifically removed.</p>
+    </div>
+    <div class="concept-card">
+      <div class="icon-chip" style="background:rgba(133,100,220,0.15);">📐</div>
+      <h3 style="color:#b09aff;">Flocculation Kinetics</h3>
+      <p>Floc growth follows: perikinetic (Brownian motion, sub-µm) and orthokinetic (velocity gradients, >1 µm) phases. The velocity gradient G (s⁻¹) and detention time t must balance: <strong>G·t = 10⁴ to 10⁵</strong>. Too high G breaks floc; too low G fails to aggregate it. Gentle mixing (G = 10–75 s⁻¹) for 20–40 min is typical.</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-eyebrow">Effect Summary</div>
+  <h3 style="font-size:1.05rem;margin-bottom:12px;">Parameter Effects on Coagulation Efficiency</h3>
+  <table class="compare-table">
+    <thead>
+      <tr><th>Parameter</th><th>Too Low</th><th>Optimal Range</th><th>Too High</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong style="color:var(--text);">pH</strong></td>
+        <td>Al forms Al³⁺ (soluble). No floc. Particle restabilisation. Corrosion risk.</td>
+        <td style="color:var(--green);">6.5 – 7.5 (alum)<br>5.5 – 6.5 (iron)</td>
+        <td>Al forms Al(OH)₄⁻ (soluble). Floc dissolves. High turbidity remains.</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text);">Alkalinity</strong></td>
+        <td>pH crash during coagulation. Poor floc formation. May need lime addition.</td>
+        <td style="color:var(--green);">80 – 200 mg/L CaCO₃</td>
+        <td>Usually acceptable. May mask pH changes. Slight reduction in efficiency at extremes.</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text);">Coagulant dose</strong></td>
+        <td>Insufficient charge neutralisation. High effluent turbidity. Poor settling.</td>
+        <td style="color:var(--green);">Determined by jar test (site-specific)</td>
+        <td>Particle restabilisation (charge reversal). Residual aluminium in water. Increased sludge.</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text);">Hardness (Ca²⁺/Mg²⁺)</strong></td>
+        <td>Less double-layer compression. Slightly less stable floc with some coagulants.</td>
+        <td style="color:var(--green);">50 – 200 mg/L CaCO₃</td>
+        <td>Competes with coagulant sites. Higher sludge volume. TDS elevated. Scale in pipes.</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--text);">Temperature</strong></td>
+        <td>Slower hydrolysis kinetics. Weaker floc. Longer mix times needed.</td>
+        <td style="color:var(--green);">15 – 25 °C</td>
+        <td>Generally not a problem. Viscosity drops; settling faster.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══════════════════════ PAGE 3: TSS vs TDS ═══════════════════════ -->
+<div class="page" id="page-tss-tds">
+  <div class="section-eyebrow">Water Quality Parameters</div>
+  <h2>Total Suspended Solids vs Total Dissolved Solids</h2>
+  <p class="lead">TSS and TDS describe physically different populations of material in water. Understanding the distinction is fundamental to selecting the right treatment process and monitoring treated water quality.</p>
+
+  <div class="tss-tds-visual">
+    <div class="water-jar">
+      <h3 style="color:#a0622a;">◉ TSS — Total Suspended Solids</h3>
+      <canvas class="jar-canvas" id="jarTSS" width="220" height="200"></canvas>
+      <div class="jar-desc">Particles <strong>retained on a 0.45 µm filter</strong>. Visible turbidity. Can be removed by sedimentation, filtration, or coagulation/flocculation. TSS is what coagulation primarily targets.</div>
+      <div class="jar-examples">
+        <span class="jar-tag" style="border-color:rgba(160,98,42,0.5);color:#c0823a;background:rgba(160,98,42,0.1);">Clay &amp; silt</span>
+        <span class="jar-tag" style="border-color:rgba(160,98,42,0.5);color:#c0823a;background:rgba(160,98,42,0.1);">Algae</span>
+        <span class="jar-tag" style="border-color:rgba(160,98,42,0.5);color:#c0823a;background:rgba(160,98,42,0.1);">Bacteria</span>
+        <span class="jar-tag" style="border-color:rgba(160,98,42,0.5);color:#c0823a;background:rgba(160,98,42,0.1);">Organic debris</span>
+        <span class="jar-tag" style="border-color:rgba(160,98,42,0.5);color:#c0823a;background:rgba(160,98,42,0.1);">Floc particles</span>
+      </div>
+    </div>
+    <div class="water-jar">
+      <h3 style="color:#4dd9ec;">◎ TDS — Total Dissolved Solids</h3>
+      <canvas class="jar-canvas" id="jarTDS" width="220" height="200"></canvas>
+      <div class="jar-desc">Ions and molecules <strong>passing through a 0.45 µm filter</strong>. Water appears clear. Cannot be removed by conventional coagulation/filtration. Requires RO, distillation, or ion exchange.</div>
+      <div class="jar-examples">
+        <span class="jar-tag">Ca²⁺ / Mg²⁺</span>
+        <span class="jar-tag">Na⁺ / K⁺</span>
+        <span class="jar-tag">Cl⁻ / SO₄²⁻</span>
+        <span class="jar-tag">HCO₃⁻</span>
+        <span class="jar-tag">Dissolved salts</span>
+        <span class="jar-tag">Heavy metals</span>
+      </div>
+    </div>
+  </div>
+
+  <table class="compare-table">
+    <thead>
+      <tr><th>Property</th><th>TSS</th><th>TDS</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Definition</strong></td><td>Particles retained on 0.45 µm membrane filter</td><td>Ions/molecules passing through 0.45 µm filter</td></tr>
+      <tr><td><strong>Size</strong></td><td>&gt;0.45 µm (colloidal to visible)</td><td>&lt;0.45 µm (molecular/ionic scale)</td></tr>
+      <tr><td><strong>Appearance</strong></td><td>Turbid, cloudy, coloured water</td><td>Clear water (may have taste/scale issues)</td></tr>
+      <tr><td><strong>Measurement</strong></td><td>Filter, dry at 105°C, weigh residue (mg/L)</td><td>Conductivity probe (EC) or evaporation at 180°C</td></tr>
+      <tr><td><strong>Removal by coagulation</strong></td><td>✅ Yes — primary target of coagulation/flocculation</td><td>❌ No — coagulation does NOT remove dissolved ions</td></tr>
+      <tr><td><strong>WHO drinking water guideline</strong></td><td>&lt;5 NTU turbidity (related parameter)</td><td>&lt;600 mg/L (palatability threshold)</td></tr>
+      <tr><td><strong>Removal methods</strong></td><td>Coagulation, flocculation, sedimentation, filtration</td><td>RO, NF, ion exchange, distillation, lime softening</td></tr>
+      <tr><td><strong>Linked to</strong></td><td>Turbidity, pathogens, sediment loading</td><td>Salinity, hardness, conductivity, scaling potential</td></tr>
+    </tbody>
+  </table>
+
+  <hr class="divider">
+  <div class="section-eyebrow">Key Relationship</div>
+  <h3 style="font-size:1.05rem;margin-bottom:10px;">Where Hardness Fits: TSS or TDS?</h3>
+  <div class="concept-card" style="max-width:680px;">
+    <div class="icon-chip" style="background:rgba(212,184,150,0.2);font-size:1.4rem;">💧</div>
+    <h3 style="color:var(--hard);">Hardness is a TDS Contributor</h3>
+    <p>Hardness ions — calcium (Ca²⁺) and magnesium (Mg²⁺) — are <strong>fully dissolved</strong> in water and therefore classified as <strong>TDS</strong>, not TSS. They pass freely through a 0.45 µm filter and cannot be seen or removed by coagulation or filtration alone.</p>
+    <p style="margin-top:10px;">However, when Ca²⁺ precipitates as CaCO₃ (e.g. during lime softening or at high pH), it becomes a suspended solid (TSS) that can then be settled and filtered out. This is the basis of <strong>lime softening</strong>.</p>
+    <p style="margin-top:10px;color:var(--accent);font-size:0.8rem;">⚠️ Coagulation reduces TSS (turbidity) — it does NOT significantly reduce TDS or hardness.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PAGE 4: HARDNESS ═══════════════════════ -->
+<div class="page" id="page-hardness">
+  <div class="section-eyebrow">Water Chemistry</div>
+  <h2>Water Hardness: Causes, Types & Removal</h2>
+  <p class="lead">Hardness is caused by dissolved divalent metal ions, primarily Ca²⁺ and Mg²⁺. It causes scale in pipes and boilers, interferes with soap lathering, and in treatment plants affects coagulation chemistry and sludge production.</p>
+
+  <div class="hardness-section">
+    <h3>Types of Hardness</h3>
+    <div class="hardness-cards">
+      <div class="hard-card temp">
+        <h4 style="color:var(--green);">✓ Temporary (Carbonate) Hardness</h4>
+        <p>Caused by Ca(HCO₃)₂ and Mg(HCO₃)₂ dissolved from limestone. Associated with bicarbonate alkalinity. <strong>Can be removed by boiling</strong> — CO₂ driven off, CaCO₃ precipitates.</p>
+        <div style="margin-top:8px;"><code>Ca(HCO₃)₂ → CaCO₃↓ + H₂O + CO₂↑</code></div>
+        <p style="margin-top:8px;">Removal: boiling, lime addition, lime-soda softening.</p>
+      </div>
+      <div class="hard-card perm">
+        <h4 style="color:#f09090;">✗ Permanent (Non-Carbonate) Hardness</h4>
+        <p>Caused by CaSO₄, CaCl₂, MgSO₄, MgCl₂. NOT associated with bicarbonate. <strong>Cannot be removed by boiling</strong>. Remains dissolved regardless of temperature.</p>
+        <div style="margin-top:8px;"><code>CaSO₄ → Ca²⁺ + SO₄²⁻ (stays dissolved)</code></div>
+        <p style="margin-top:8px;">Removal: lime-soda ash process, ion exchange, RO, nanofiltration.</p>
+      </div>
+      <div class="concept-card" style="border-color:rgba(212,184,150,0.25);">
+        <div class="icon-chip" style="background:rgba(212,184,150,0.15);font-size:1rem;">📊</div>
+        <h3>Hardness Classification (mg/L CaCO₃)</h3>
+        <table style="width:100%;font-size:0.78rem;border-collapse:collapse;margin-top:6px;">
+          <tr style="color:var(--muted);border-bottom:1px solid var(--border);"><td style="padding:6px 4px;"><strong style="color:var(--text);">0–75</strong></td><td style="padding:6px 4px;">Soft</td></tr>
+          <tr style="color:var(--muted);border-bottom:1px solid var(--border);"><td style="padding:6px 4px;"><strong style="color:var(--text);">75–150</strong></td><td style="padding:6px 4px;">Moderately hard</td></tr>
+          <tr style="color:var(--muted);border-bottom:1px solid var(--border);"><td style="padding:6px 4px;"><strong style="color:var(--text);">150–300</strong></td><td style="padding:6px 4px;">Hard</td></tr>
+          <tr style="color:var(--muted);"><td style="padding:6px 4px;"><strong style="color:var(--text);">&gt;300</strong></td><td style="padding:6px 4px;">Very hard</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-eyebrow">Treatment Methods</div>
+  <h3 style="font-size:1.05rem;margin-bottom:16px;">Hardness Removal Processes</h3>
+  <div class="removal-grid">
+    <div class="removal-card">
+      <div class="step-num">Method 01</div>
+      <h4>Lime-Soda Ash Softening</h4>
+      <p>Lime (Ca(OH)₂) raises pH to ~10–11, precipitating CaCO₃ and Mg(OH)₂ as settleable solids. Soda ash (Na₂CO₃) removes non-carbonate Ca²⁺. Most common large-scale process.</p>
+      <div class="chem">Ca²⁺ + CO₃²⁻ → CaCO₃↓ | Mg²⁺ + 2OH⁻ → Mg(OH)₂↓</div>
+    </div>
+    <div class="removal-card">
+      <div class="step-num">Method 02</div>
+      <h4>Ion Exchange (Zeolite/Resin)</h4>
+      <p>Cation exchange resin replaces Ca²⁺ and Mg²⁺ with Na⁺. Common in domestic water softeners. Does NOT reduce TDS — replaces hardness ions with Na⁺. Regenerated with NaCl brine.</p>
+      <div class="chem">Ca²⁺ + 2Na-Resin → Ca-Resin₂ + 2Na⁺</div>
+    </div>
+    <div class="removal-card">
+      <div class="step-num">Method 03</div>
+      <h4>Reverse Osmosis (RO)</h4>
+      <p>Pressure-driven membrane process. Rejects &gt;95% of dissolved ions including Ca²⁺ and Mg²⁺. Reduces both TDS and hardness simultaneously. Used in desalination and industrial boiler feed water treatment.</p>
+      <div class="chem">Semi-permeable membrane: pore size ~0.0001 µm rejects ions</div>
+    </div>
+    <div class="removal-card">
+      <div class="step-num">Method 04</div>
+      <h4>Nanofiltration (NF)</h4>
+      <p>Removes divalent ions (Ca²⁺, Mg²⁺, SO₄²⁻) selectively while passing monovalent ions (Na⁺, Cl⁻). Lower pressure than RO. Often used for selective hardness removal while retaining some dissolved minerals.</p>
+      <div class="chem">~90–98% rejection of Ca²⁺/Mg²⁺; ~20–40% rejection of Na⁺</div>
+    </div>
+    <div class="removal-card">
+      <div class="step-num">Method 05</div>
+      <h4>Electrodialysis (ED)</h4>
+      <p>Ion-selective membranes with an electric field drive cations and anions apart. Effective for brackish water demineralisation. Less common for hardness alone but reduces overall TDS.</p>
+      <div class="chem">Cation-exchange + anion-exchange membranes in stack configuration</div>
+    </div>
+    <div class="removal-card">
+      <div class="step-num">Method 06</div>
+      <h4>Distillation / Boiling</h4>
+      <p>Vaporises water, leaving dissolved solids behind. Removes temporary hardness effectively. Impractical at large scale due to energy cost. Used for laboratory-grade deionised water.</p>
+      <div class="chem">Only removes temporary hardness (carbonate forms) completely</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="section-eyebrow">Connecting the Concepts</div>
+  <h3 style="font-size:1.05rem;margin-bottom:14px;">Relationship: Hardness ↔ TSS ↔ TDS ↔ Coagulation</h3>
+  <div class="concept-grid">
+    <div class="concept-card">
+      <h3 style="color:var(--cyan);">Hardness → TDS (not TSS)</h3>
+      <p>In its dissolved form, hardness contributes to TDS. Ca²⁺ and Mg²⁺ pass through 0.45 µm filters. Coagulation does NOT remove hardness — it removes TSS (turbidity/suspended particles).</p>
+    </div>
+    <div class="concept-card">
+      <h3 style="color:var(--green);">Lime Softening Converts Hardness to TSS</h3>
+      <p>Adding lime raises pH until CaCO₃ and Mg(OH)₂ precipitate. These precipitates are now TSS — they can be settled and filtered. Hardness has been converted from TDS → TSS → removed.</p>
+    </div>
+    <div class="concept-card">
+      <h3 style="color:var(--accent);">Coagulation + Softening Together</h3>
+      <p>Many plants run lime softening before or alongside coagulation. Lime softening raises pH and removes hardness. Then CO₂ or acid re-stabilises pH, and coagulant removes remaining TSS. This treats both hardness (TDS) and turbidity (TSS).</p>
+    </div>
+    <div class="concept-card">
+      <h3 style="color:#f09090;">Effect of Hardness on Coagulation</h3>
+      <p>Moderate hardness (50–200 mg/L) slightly aids coagulation by compressing the electrical double layer (Ca²⁺ acts like a secondary coagulant aid). Very high hardness (&gt;300 mg/L) may reduce coagulant performance and significantly increases sludge mass.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══ TAB NAVIGATION ═══
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  event.target.classList.add('active');
+
+  if (id === 'tss-tds') { drawJars(); }
+}
+
+// ═══ SIMULATION ENGINE ═══
+const canvas = document.getElementById('tankCanvas');
+const ctx = canvas.getContext('2d');
+let particles = [];
+let animFrame;
+
+function calcEfficiency() {
+  const ph = +document.getElementById('slPH').value;
+  const alk = +document.getElementById('slAlk').value;
+  const coag = +document.getElementById('slCoag').value;
+  const hard = +document.getElementById('slHard').value;
+
+  // pH score (bell curve centred at 7.0)
+  const phScore = Math.max(0, 1 - Math.pow((ph - 7.0) / 1.8, 2));
+
+  // Alkalinity score (sigmoidal; peaks 80–200)
+  const alkScore = Math.max(0, Math.min(1, (alk - 15) / 65)) * 0.7 +
+    (alk > 40 ? 0.3 : 0);
+
+  // Coagulant score (optimum ~20–35 mg/L, overdose drops off)
+  let coagScore;
+  if (coag < 5) coagScore = coag / 5 * 0.3;
+  else if (coag <= 35) coagScore = 0.3 + (coag - 5) / 30 * 0.7;
+  else coagScore = Math.max(0, 1 - (coag - 35) / 45);
+
+  // Hardness penalty above 300
+  const hardPenalty = hard > 300 ? (hard - 300) / 400 * 0.2 : 0;
+
+  const eff = Math.min(98, Math.max(2, (phScore * 0.45 + alkScore * 0.25 + coagScore * 0.35 - hardPenalty) * 100));
+  return { eff, phScore, alkScore, coagScore, hard };
+}
+
+function updateSim() {
+  const ph = +document.getElementById('slPH').value;
+  const alk = +document.getElementById('slAlk').value;
+  const coag = +document.getElementById('slCoag').value;
+  const hard = +document.getElementById('slHard').value;
+
+  document.getElementById('valPH').textContent = ph.toFixed(1);
+  document.getElementById('valAlk').textContent = alk;
+  document.getElementById('valCoag').textContent = coag;
+  document.getElementById('valHard').textContent = hard;
+
+  const { eff } = calcEfficiency();
+  const effRound = Math.round(eff);
+
+  // Update efficiency bar
+  const bar = document.getElementById('effBar');
+  const effValEl = document.getElementById('effVal');
+  bar.style.width = effRound + '%';
+  const color = eff > 75 ? '#2ec27e' : eff > 45 ? '#f0c040' : '#e05050';
+  bar.style.background = color;
+  effValEl.textContent = effRound + '%';
+  effValEl.style.color = color;
+
+  // Status message
+  const msg = document.getElementById('statusMsg');
+  let statusText = '', statusClass = '';
+  if (eff > 80) {
+    statusText = '✅ Excellent conditions. Effective floc formation expected. Turbidity removal >80%.';
+    statusClass = 'status-good';
+  } else if (eff > 55) {
+    statusText = buildWarnings(ph, alk, coag, hard);
+    statusClass = 'status-warn';
+  } else {
+    statusText = buildWarnings(ph, alk, coag, hard, true);
+    statusClass = 'status-bad';
+  }
+  msg.textContent = statusText;
+  msg.className = 'status-msg ' + statusClass;
+
+  // Metrics
+  const rawTSS = 120 + hard * 0.1;
+  const treatedTSS = rawTSS * (1 - eff / 100);
+  const rawTurb = rawTSS * 0.8;
+  const treatedTurb = rawTurb * (1 - eff / 100);
+  const tds = 200 + hard * 0.85; // hardness contributes to TDS
+
+  document.getElementById('mTurbidity').textContent = Math.round(treatedTurb);
+  document.getElementById('mTSS').textContent = Math.round(treatedTSS);
+  document.getElementById('mTDS').textContent = Math.round(tds);
+  document.getElementById('mHardness').textContent = hard;
+
+  drawTank(eff, hard);
+}
+
+function buildWarnings(ph, alk, coag, hard, severe) {
+  const issues = [];
+  if (ph < 6.0 || ph > 8.5) issues.push(ph < 6 ? 'pH too low — Al³⁺ forms, no floc' : 'pH too high — aluminate forms, no floc');
+  if (alk < 40) issues.push('Low alkalinity — pH may crash during coagulation');
+  if (coag < 8) issues.push('Underdosing coagulant — insufficient charge neutralisation');
+  if (coag > 55) issues.push('Overdosing — particle restabilisation may occur');
+  if (hard > 350) issues.push('Very hard water — reduced coagulant efficiency, high sludge');
+  if (issues.length === 0) issues.push(severe ? 'Multiple parameters suboptimal — review all controls' : 'Conditions acceptable but not optimal');
+  return (severe ? '⚠️ Poor: ' : '⚡ Warning: ') + issues.join('; ') + '.';
+}
+
+// ═══ CANVAS DRAWING ═══
+function drawTank(eff, hard) {
+  const W = canvas.width = canvas.offsetWidth;
+  const H = canvas.height = 320;
+  ctx.clearRect(0, 0, W, H);
+
+  // Water body
+  const turbidity = 1 - eff / 100;
+  const r = Math.round(8 + turbidity * 100);
+  const g = Math.round(18 + turbidity * 60);
+  const b = Math.round(40 + turbidity * 20);
+  const waterColor = `rgb(${r},${g},${b})`;
+
+  ctx.fillStyle = waterColor;
+  ctx.fillRect(0, 0, W, H);
+
+  // Settled sludge layer
+  const sludgeH = 20 + (1 - eff / 100) * 40 + hard * 0.05;
+  const sludgeGrad = ctx.createLinearGradient(0, H - sludgeH, 0, H);
+  sludgeGrad.addColorStop(0, 'rgba(120,70,10,0)');
+  sludgeGrad.addColorStop(0.4, 'rgba(120,70,10,0.6)');
+  sludgeGrad.addColorStop(1, 'rgba(80,40,5,0.9)');
+  ctx.fillStyle = sludgeGrad;
+  ctx.fillRect(0, H - sludgeH - 10, W, sludgeH + 10);
+
+  // Particles (suspended)
+  const nParticles = Math.round(30 + turbidity * 120);
+  const seed = 42;
+  for (let i = 0; i < nParticles; i++) {
+    const x = ((i * 137 + seed) % W);
+    const baseY = 20 + ((i * 97 + seed) % (H - 80));
+    const size = eff > 60 ? 1 + (i % 3) * 0.8 : 1.5 + (i % 4) * 1.2;
+
+    // Floc colour — larger floc as efficiency improves
+    if (eff > 60 && i % 3 === 0) {
+      // Floc aggregate
+      ctx.fillStyle = `rgba(200,164,110,${0.4 + turbidity * 0.4})`;
+      ctx.beginPath();
+      ctx.arc(x, baseY, size * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = `rgba(160,98,42,${0.3 + turbidity * 0.5})`;
+      ctx.beginPath();
+      ctx.arc(x, baseY, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Hardness mineral sparkles (dissolved — shown as faint shimmer)
+  if (hard > 100) {
+    const nMinerals = Math.round(hard / 20);
+    for (let i = 0; i < nMinerals; i++) {
+      const mx = ((i * 211 + 17) % W);
+      const my = 10 + ((i * 173 + 23) % (H - 30));
+      ctx.fillStyle = `rgba(212,184,150,${0.08 + (hard / 3000)})`;
+      ctx.beginPath();
+      ctx.arc(mx, my, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Surface light shimmer
+  const shimGrad = ctx.createLinearGradient(0, 0, 0, 30);
+  shimGrad.addColorStop(0, 'rgba(77,217,236,0.15)');
+  shimGrad.addColorStop(1, 'rgba(77,217,236,0)');
+  ctx.fillStyle = shimGrad;
+  ctx.fillRect(0, 0, W, 30);
+
+  // Labels
+  ctx.font = '11px Segoe UI, system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(184,240,249,0.6)';
+  ctx.fillText('INFLUENT →', 10, 18);
+  ctx.fillText('← EFFLUENT', W - 90, 18);
+
+  // Efficiency overlay text
+  if (eff > 75) {
+    ctx.font = 'bold 13px Segoe UI, system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(46,194,126,0.8)';
+    ctx.fillText('Good floc forming ✓', W / 2 - 60, H / 2);
+  } else if (eff < 35) {
+    ctx.font = 'bold 13px Segoe UI, system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(224,80,80,0.8)';
+    ctx.fillText('Poor treatment — adjust controls', W / 2 - 100, H / 2);
+  }
+
+  // Sludge label
+  ctx.font = '10px Segoe UI, system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(200,164,110,0.7)';
+  ctx.fillText('settled sludge', 10, H - 8);
+}
+
+// ═══ JAR CANVASES (TSS vs TDS) ═══
+function drawJars() {
+  drawJarTSS();
+  drawJarTDS();
+}
+
+function drawJarTSS() {
+  const c = document.getElementById('jarTSS');
+  if (!c) return;
+  const ctx2 = c.getContext('2d');
+  const W = 220, H = 200;
+  ctx2.clearRect(0, 0, W, H);
+
+  // Turbid water
+  ctx2.fillStyle = '#3a1a08';
+  ctx2.fillRect(10, 10, W - 20, H - 20);
+
+  // Scattered particles
+  for (let i = 0; i < 60; i++) {
+    const x = 15 + (i * 137 % (W - 30));
+    const y = 15 + (i * 97 % (H - 30));
+    const r2 = 1.5 + (i % 5);
+    ctx2.fillStyle = `rgba(${140 + i % 60},${80 + i % 40},${20 + i % 20},0.8)`;
+    ctx2.beginPath();
+    ctx2.arc(x, y, r2, 0, Math.PI * 2);
+    ctx2.fill();
+  }
+
+  // Filter line
+  ctx2.strokeStyle = 'rgba(77,217,236,0.7)';
+  ctx2.lineWidth = 2;
+  ctx2.setLineDash([4, 3]);
+  ctx2.beginPath();
+  ctx2.moveTo(10, H / 2);
+  ctx2.lineTo(W - 10, H / 2);
+  ctx2.stroke();
+  ctx2.setLineDash([]);
+  ctx2.font = '10px Segoe UI';
+  ctx2.fillStyle = 'rgba(77,217,236,0.8)';
+  ctx2.fillText('0.45 µm filter', W / 2 - 35, H / 2 - 5);
+  ctx2.fillText('RETAINED ↑ (TSS)', W / 2 - 45, H / 2 + 14);
+
+  // Border
+  ctx2.strokeStyle = 'rgba(160,98,42,0.5)';
+  ctx2.lineWidth = 1;
+  ctx2.setLineDash([]);
+  ctx2.strokeRect(10, 10, W - 20, H - 20);
+}
+
+function drawJarTDS() {
+  const c = document.getElementById('jarTDS');
+  if (!c) return;
+  const ctx2 = c.getContext('2d');
+  const W = 220, H = 200;
+  ctx2.clearRect(0, 0, W, H);
+
+  // Clear water
+  ctx2.fillStyle = '#071828';
+  ctx2.fillRect(10, 10, W - 20, H - 20);
+
+  // Dissolved ions (tiny dots)
+  for (let i = 0; i < 80; i++) {
+    const x = 15 + (i * 139 % (W - 30));
+    const y = 15 + (i * 101 % (H - 30));
+    ctx2.fillStyle = i % 3 === 0 ? 'rgba(212,184,150,0.5)' :
+                     i % 3 === 1 ? 'rgba(77,217,236,0.3)' : 'rgba(200,150,200,0.3)';
+    ctx2.beginPath();
+    ctx2.arc(x, y, 2, 0, Math.PI * 2);
+    ctx2.fill();
+  }
+
+  // Filter line — ions pass through
+  ctx2.strokeStyle = 'rgba(77,217,236,0.7)';
+  ctx2.lineWidth = 2;
+  ctx2.setLineDash([4, 3]);
+  ctx2.beginPath();
+  ctx2.moveTo(10, H / 2);
+  ctx2.lineTo(W - 10, H / 2);
+  ctx2.stroke();
+  ctx2.setLineDash([]);
+  ctx2.font = '10px Segoe UI';
+  ctx2.fillStyle = 'rgba(77,217,236,0.8)';
+  ctx2.fillText('0.45 µm filter', W / 2 - 35, H / 2 - 5);
+  ctx2.fillText('PASSES THROUGH ↓ (TDS)', W / 2 - 65, H / 2 + 14);
+
+  // Border
+  ctx2.strokeStyle = 'rgba(77,217,236,0.3)';
+  ctx2.lineWidth = 1;
+  ctx2.strokeRect(10, 10, W - 20, H - 20);
+}
+
+function resetSim() {
+  document.getElementById('slPH').value = 7.0;
+  document.getElementById('slAlk').value = 80;
+  document.getElementById('slCoag').value = 20;
+  document.getElementById('slHard').value = 150;
+  updateSim();
+}
+
+function optimalSim() {
+  document.getElementById('slPH').value = 7.0;
+  document.getElementById('slAlk').value = 120;
+  document.getElementById('slCoag').value = 25;
+  document.getElementById('slHard').value = 100;
+  updateSim();
+}
+
+// Init
+updateSim();
+</script>
+</body>
+</html>
